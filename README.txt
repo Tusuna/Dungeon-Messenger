@@ -22,7 +22,6 @@ Current commands:
 
 TODO:
 - Boss detection*
-- Setup default profile waypoints*
-- Add debug mode option (currently on by default, not changeable), currently in untested branch
-- make /dmsg add use players current pos for cords if arg not specified, currently in untested branch
+- Setup default profile waypoints, semi done - need more waypoints
 - come up with better name*
+
