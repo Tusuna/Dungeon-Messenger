@@ -1,1 +1,48 @@
-
+{
+  "profiles": {
+    "Default": [
+      {
+        "x": 73,
+        "y": 165,
+        "z": 45,
+        "name": "p2",
+        "lastTriggered": 1757446858107,
+        "triggered": true
+      },
+      {
+        "x": 108,
+        "y": 120,
+        "z": 94,
+        "name": "ssc",
+        "lastTriggered": 1757446741457,
+        "triggered": true
+      },
+      {
+        "x": 57,
+        "y": 109,
+        "z": 131,
+        "name": "ee2",
+        "lastTriggered": 1757446769607,
+        "triggered": true
+      },
+      {
+        "x": 56,
+        "y": 114,
+        "z": 61,
+        "name": "core",
+        "lastTriggered": 1757446814958,
+        "triggered": true
+      }
+    ],
+    "Custom 1": [],
+    "Custom 2": [],
+    "Custom 3": [],
+    "Custom 4": [],
+    "Custom 5": []
+  },
+  "config": {
+    "tolerance": 3,
+    "cooldown": 6000,
+    "debug": false
+  }
+}
