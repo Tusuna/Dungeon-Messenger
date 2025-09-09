@@ -6,9 +6,11 @@ let activeProfile = "Default";
 let config = {
     tolerance: 2,
     cooldown: 5000
+    debug = false
 };
 let tolerance = config.tolerance;
 let cooldown = config.cooldown;
+let debug = config.debug;
 
 
 
@@ -21,9 +23,11 @@ function saveAll() {
             profiles: profiles,
             config: config
         }, null, 2));
-        ChatLib.chat("&d[DEBUG:saveAll] Saved profiles + config");
+        if (config.debug) {
+        ChatLib.chat("&d[DEBUG:saveAll] Saved profiles + config");}
     } catch (e) {
-        ChatLib.chat("&c[DEBUG:saveAll] Failed to save: " + e);
+        if (config.debug) {
+        ChatLib.chat("&c[DEBUG:saveAll] Failed to save: " + e);}
     }
 }
 
@@ -40,13 +44,16 @@ function loadAll() {
             // sync globals
             tolerance = config.tolerance;
             cooldown = config.cooldown;
-
-            ChatLib.chat("&d[DEBUG:loadAll] Loaded profiles + config");
+            debug = config.debug
+            if (config.debug) {
+            ChatLib.chat("&d[DEBUG:loadAll] Loaded profiles + config");}
         } else {
-            ChatLib.chat("&e[DEBUG:loadAll] No saved file, starting fresh");
+            if (config.debug) {
+            ChatLib.chat("&e[DEBUG:loadAll] No saved file, starting fresh");}
         }
     } catch (e) {
-        ChatLib.chat("&c[DEBUG:loadAll] Failed to load: " + e);
+        if (config.debug) {
+        ChatLib.chat("&c[DEBUG:loadAll] Failed to load: " + e);}
     }
 }
 
@@ -78,9 +85,9 @@ register("command", function(...args) {
         removeWaypoint(...args)
         }
         else if (args[0] === "debugsave") {
-        ChatLib.chat("&d[DEBUG] Profiles in memory: " + JSON.stringify(profiles));
+            if (config.debug) {
+        ChatLib.chat("&d[DEBUG] Profiles in memory: " + JSON.stringify(profiles));}
         saveAll();
-
 }
         else {
         openDungeonMsgGUI();
@@ -88,7 +95,8 @@ register("command", function(...args) {
 }).setName("dmsg");
 
 function openDungeonMsgGUI() {
-    ChatLib.chat("&d[DEBUG:openDungeonMsgGUI] Opening GUI");
+    if (config.debug) {
+    ChatLib.chat("&d[DEBUG:openDungeonMsgGUI] Opening GUI");}
     gui.open();
 }
 
@@ -106,27 +114,38 @@ function printWaypoints() {
 }
 
 
-function addWaypoint(blank,x,y,z, ...name) {
-     ChatLib.chat("&d[DEBUG:/dmadd] Command triggered with args: " + [x, y, z, name.join(" ")]);
+function addWaypoint(blank, ...args) {
+    let x, y, z, name;
 
-    if (!x || !y || !z || name.length === 0) {
-        ChatLib.chat("&c[DEBUG:/dmadd] Invalid usage");
+    if (args.length >= 4) {
+        // User provided coordinates
+        x = parseInt(args[0]);
+        y = parseInt(args[1]);
+        z = parseInt(args[2]);
+        name = args.slice(3).join(" ");
+    } else if (args.length >= 1) {
+        // User only provided a name, use current position
+        x = Math.floor(Player.getX());
+        y = Math.floor(Player.getY());
+        z = Math.floor(Player.getZ());
+        name = args.join(" ");
+    } else {
+        // Invalid usage
+        ChatLib.chat("&cUsage: /dmsg add [x] [y] [z] <name> or /dmsg add <name>");
         return;
     }
+
     const wp = {
-    x: parseInt(x),
-    y: parseInt(y),
-    z: parseInt(z),
-    name: name.join(" "),
-    lastTriggered: 0 // new field
-};
+        x: x,
+        y: y,
+        z: z,
+        name: name,
+        lastTriggered: 0
+    };
 
     profiles[activeProfile].push(wp);
     saveAll();
-
-
-    ChatLib.chat("&a[DEBUG:/dmadd] Waypoint added to " + activeProfile + ": " + wp.name);
-
+    ChatLib.chat("&a[DungeonMsg] Waypoint added to " + activeProfile + ": " + wp.name);
 }
 
 function removeWaypoint(blank, indexStr) {
@@ -148,7 +167,7 @@ function removeWaypoint(blank, indexStr) {
         return;
     }
 
-    // Adjust index (player sees 1-based list, array is 0-based)
+    // Adjust index (shifts array to make first waypoint 1 for player)
     let removed = wpList.splice(index - 1, 1);
     saveAll();
 
@@ -170,14 +189,16 @@ register("tick", function() {
 
         let wpList = profiles[activeProfile];
         if (!wpList) {
-            ChatLib.chat("&c[DEBUG:tick] No waypoints in profile " + activeProfile);
+            if (config.debug) {
+            ChatLib.chat("&c[DEBUG:tick] No waypoints in profile " + activeProfile);}
             return;
         }
 
         for (let i = 0; i < wpList.length; i++) {
             let wp = wpList[i];
             if (withinTolerance(pos, wp, tolerance)) {
-                ChatLib.chat("&b[DEBUG:tick] Entered waypoint " + wp.name);
+                if (config.debug) {
+                ChatLib.chat("&b[DEBUG:tick] Entered waypoint " + wp.name);}
                 ChatLib.say("at " + wp.name);
                 wp.triggered = true;
             }
@@ -206,26 +227,27 @@ function withinTolerance(p, wp, tol) {
     return false;
 }
 
-
-/* ------------------ GUI ------------------ */
-// touching the gui code at all seems to break everything
-// but TODO: Add interaction and functionality to it
-// basically just a debug gui at the moment
 /* ------------------ GUI ------------------ */
 let gui = new Gui();
 
-// Simple toggle button geometry
-const buttonX = 10, buttonW = 110, buttonH = 22, toggle_Y = 25 ,profile_Y = 50, tolerance_Y = 75, timer_Y = 100;
+//  button geometry (size and x are same for every button)
+const buttonX = 10, buttonW = 110, buttonH = 22, 
+toggle_Y = 25 ,
+profile_Y = 50, 
+tolerance_Y = 75, 
+timer_Y = 100,
+debug_Y = 125;
 
 function openDungeonMsgGUI() {
-  ChatLib.chat("&d[DEBUG:openDungeonMsgGUI] Opening GUI");
+    if (config.debug) {
+  ChatLib.chat("&d[DEBUG:openDungeonMsgGUI] Opening GUI");}
   gui.open();
 }
 
 gui.registerDraw(function(mouseX, mouseY, partialTicks) {
   Renderer.drawStringWithShadow("§bDungeonMsg Config", 10, 10);
 
-  // Toggle Button (hover highlight)
+  // Toggle Button 
   const toggleHovering = mouseX >= buttonX && mouseX <= buttonX + buttonW &&
                    mouseY >= toggle_Y && mouseY <= toggle_Y + buttonH;
 
@@ -233,7 +255,7 @@ gui.registerDraw(function(mouseX, mouseY, partialTicks) {
   if (toggleHovering) Renderer.drawRect(Renderer.color(255, 255, 255, 30), buttonX, toggle_Y, buttonW, buttonH);
   Renderer.drawStringWithShadow("Toggle: " + (enabled ? "§aON" : "§cOFF"), buttonX + 6, toggle_Y + 6);
 
-    // Profile Button (hover highlight)
+    // Profile Button
   const profileHovering = mouseX >= buttonX && mouseX <= buttonX + buttonW &&
                    mouseY >= profile_Y && mouseY <= profile_Y + buttonH;
 
@@ -241,7 +263,7 @@ gui.registerDraw(function(mouseX, mouseY, partialTicks) {
   if (profileHovering) Renderer.drawRect(Renderer.color(255, 255, 255, 30), buttonX, profile_Y, buttonW, buttonH);
   Renderer.drawStringWithShadow("Profile: " + activeProfile, buttonX + 6, profile_Y + 6);
 
-// Tolerance Button (hover highlight)
+// Tolerance Button
   const toleranceHovering = mouseX >= buttonX && mouseX <= buttonX + buttonW &&
                    mouseY >= tolerance_Y && mouseY <= tolerance_Y + buttonH;
 
@@ -249,15 +271,24 @@ gui.registerDraw(function(mouseX, mouseY, partialTicks) {
   if (toleranceHovering) Renderer.drawRect(Renderer.color(255, 255, 255, 30), buttonX, tolerance_Y, buttonW, buttonH);
   Renderer.drawStringWithShadow("Tolerance: " + tolerance + " blocks", buttonX + 6, tolerance_Y + 6);
 
-// Timer Button (hover highlight)
+// Timer Button
 const timerHovering = mouseX >= buttonX && mouseX <= buttonX + buttonW &&
                       mouseY >= timer_Y && mouseY <= timer_Y + buttonH;
 
 Renderer.drawRect(Renderer.color(50, 50, 50, 180), buttonX, timer_Y, buttonW, buttonH);
 if (timerHovering) Renderer.drawRect(Renderer.color(255, 255, 255, 30), buttonX, timer_Y, buttonW, buttonH);
 Renderer.drawStringWithShadow("Timer: " + (cooldown / 1000) + " seconds", buttonX + 6, timer_Y + 6);
+
+// Debug Button 
+const debugHovering = mouseX >= buttonX && mouseX <= buttonX + buttonW &&
+                      mouseY >= debug_Y && mouseY <= debug_Y + buttonH;
+
+Renderer.drawRect(Renderer.color(50, 50, 50, 180), buttonX, debug_Y, buttonW, buttonH);
+if (debugHovering) Renderer.drawRect(Renderer.color(255, 255, 255, 30), buttonX, debug_Y, buttonW, buttonH);
+Renderer.drawStringWithShadow("Debug Mode: " + (debug ? "§aON" : "§cOFF"), buttonX + 6, debug_Y + 6);
 });
 
+// gui interaction functionality
 gui.registerClicked(function(mouseX, mouseY, button) {
   // Toggle button
   if (mouseX >= buttonX && mouseX <= buttonX + buttonW &&
@@ -293,4 +324,12 @@ else if (mouseX >= buttonX && mouseX <= buttonX + buttonW &&
     config.cooldown = cooldown;
     saveAll();
     ChatLib.chat("&e[DungeonMsg] Timer set to: §b" + (cooldown / 1000) + " seconds");
-}})
+}
+// Debug button
+else if (mouseX >= buttonX && mouseX <= buttonX + buttonW &&
+        mouseY >= debug_Y && mouseY<= timer_Y + buttonH) {
+             debug = !debug;
+             saveAll();
+            ChatLib.chat("&e[DungeonMsg] debug set to: " + (debug ? "§aON" : "§cOFF"));
+        }
+})
