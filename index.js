@@ -5,12 +5,12 @@ let enabled = true;
 let activeProfile = "Default";
 let config = {
     tolerance: 2,
-    cooldown: 5000
-    debug = false
+    cooldown: 5000,
+    debug: false
 };
+let debug = config.debug;
 let tolerance = config.tolerance;
 let cooldown = config.cooldown;
-let debug = config.debug;
 
 
 
@@ -23,10 +23,10 @@ function saveAll() {
             profiles: profiles,
             config: config
         }, null, 2));
-        if (config.debug) {
+        if (debug === true) {
         ChatLib.chat("&d[DEBUG:saveAll] Saved profiles + config");}
     } catch (e) {
-        if (config.debug) {
+        if (debug === true) {
         ChatLib.chat("&c[DEBUG:saveAll] Failed to save: " + e);}
     }
 }
@@ -42,17 +42,18 @@ function loadAll() {
             config = parsed.config || config;
 
             // sync globals
+            config = parsed.config || config;
             tolerance = config.tolerance;
             cooldown = config.cooldown;
-            debug = config.debug
-            if (config.debug) {
+            debug = config.debug;
+            if (debug === true) {
             ChatLib.chat("&d[DEBUG:loadAll] Loaded profiles + config");}
         } else {
-            if (config.debug) {
+            if (debug === true) {
             ChatLib.chat("&e[DEBUG:loadAll] No saved file, starting fresh");}
         }
     } catch (e) {
-        if (config.debug) {
+        if (debug === true) {
         ChatLib.chat("&c[DEBUG:loadAll] Failed to load: " + e);}
     }
 }
@@ -85,7 +86,7 @@ register("command", function(...args) {
         removeWaypoint(...args)
         }
         else if (args[0] === "debugsave") {
-            if (config.debug) {
+            if (debug === true) {
         ChatLib.chat("&d[DEBUG] Profiles in memory: " + JSON.stringify(profiles));}
         saveAll();
 }
@@ -95,7 +96,7 @@ register("command", function(...args) {
 }).setName("dmsg");
 
 function openDungeonMsgGUI() {
-    if (config.debug) {
+    if (debug === true) {
     ChatLib.chat("&d[DEBUG:openDungeonMsgGUI] Opening GUI");}
     gui.open();
 }
@@ -168,7 +169,8 @@ function removeWaypoint(blank, indexStr) {
     }
 
     // Adjust index (shifts array to make first waypoint 1 for player)
-    let removed = wpList.splice(index - 1, 1);
+    let removed = wpList.splice(index - 1, 1)[0];
+ChatLib.chat("&a[DungeonMsg] Removed waypoint #" + index + ": " + removed.name)
     saveAll();
 
 
@@ -189,7 +191,7 @@ register("tick", function() {
 
         let wpList = profiles[activeProfile];
         if (!wpList) {
-            if (config.debug) {
+            if (debug === true) {
             ChatLib.chat("&c[DEBUG:tick] No waypoints in profile " + activeProfile);}
             return;
         }
@@ -197,7 +199,7 @@ register("tick", function() {
         for (let i = 0; i < wpList.length; i++) {
             let wp = wpList[i];
             if (withinTolerance(pos, wp, tolerance)) {
-                if (config.debug) {
+                if (debug === true) {
                 ChatLib.chat("&b[DEBUG:tick] Entered waypoint " + wp.name);}
                 ChatLib.say("at " + wp.name);
                 wp.triggered = true;
@@ -239,7 +241,7 @@ timer_Y = 100,
 debug_Y = 125;
 
 function openDungeonMsgGUI() {
-    if (config.debug) {
+    if (debug === true) {
   ChatLib.chat("&d[DEBUG:openDungeonMsgGUI] Opening GUI");}
   gui.open();
 }
@@ -327,9 +329,10 @@ else if (mouseX >= buttonX && mouseX <= buttonX + buttonW &&
 }
 // Debug button
 else if (mouseX >= buttonX && mouseX <= buttonX + buttonW &&
-        mouseY >= debug_Y && mouseY<= timer_Y + buttonH) {
-             debug = !debug;
-             saveAll();
-            ChatLib.chat("&e[DungeonMsg] debug set to: " + (debug ? "§aON" : "§cOFF"));
-        }
+         mouseY >= debug_Y && mouseY <= debug_Y + buttonH) {
+    debug = !debug;
+    config.debug = debug;
+    saveAll();
+    ChatLib.chat("&e[DungeonMsg] Debug set to: " + (debug ? "§aON" : "§cOFF"));
+}
 })
