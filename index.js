@@ -1,18 +1,19 @@
-/// <reference lib="es2015" />
-
 /* ------------------ Global State ------------------ */
-let enabled = true;
 let activeProfile = "Default";
 let config = {
     tolerance: 2,
     cooldown: 5000,
-    debug: false
+    debug: false,
+    moduleEnabled: true;
+    alwaysOn: false;
+    bossActive: false;
 };
 let debug = config.debug;
 let tolerance = config.tolerance;
 let cooldown = config.cooldown;
-
-
+let moduleEnabled = config.moduleEnabled;
+let alwaysOn = config.alwaysOn;
+let bossActive = config.bossActive;
 
 /* ------------------ Profile Loading ------------------ */
 const savePath = "DungeonMsg"; // folder in ./config/ChatTriggers/modules/
@@ -30,8 +31,6 @@ function saveAll() {
         ChatLib.chat("&c[DEBUG:saveAll] Failed to save: " + e);}
     }
 }
-
-
 
 function loadAll() {
     try {
@@ -180,40 +179,53 @@ ChatLib.chat("&a[DungeonMsg] Removed waypoint #" + index + ": " + removed.name)
 }
 
 
-/* ------------------ Detect Boss Start ------------------ */
-// TODO: figure out when tigger i can use for boss start 
-// currently boss is set to always active
+/* ------------------ Boss detection ------------------ */
+register("chat", (msg) => {
+    if (msg.includes("picked up Energy Crstal!") || msg.includes("[BOSS] Maxor:")) {
+        bossActive = true;
+        if (debug) ChatLib.chat("&d[DEBUG] Boss detected from chat:" + msg);
+    }
+});
+
+register("renderOverlay", 90 => {
+    let bar = bossbar.getName();
+    if (bar && bar.includes("Maxor")) {
+        bossActive = true;
+        if (debug) ChatLib.chat("&d[DEBUG] Boss detected from bossbar");
+    }
+});
+
+register("serverConnect", () => {
+    bossActive = false;
+       if (debug) ChatLib.chat("&d[DEBUG] Server swap detected");
+});
+
 
 /* ------------------ Waypoint Detection ------------------ */
 register("tick", function() {
-    if (enabled === true) {
-        let pos = { x: Math.floor(Player.getX()), y: Math.floor(Player.getY()), z: Math.floor(Player.getZ()) };
+    if (!(moduleEnabled && (alwaysOn || bossActive))) return;
 
-        let wpList = profiles[activeProfile];
-        if (!wpList) {
-            if (debug === true) {
-            ChatLib.chat("&c[DEBUG:tick] No waypoints in profile " + activeProfile);}
-            return;
-        }
+    let pos = { x: Math.floor(Player.getX()), y: Math.floor(Player.getY()), z: Math.floor(Player.getZ()) };
 
-        for (let i = 0; i < wpList.length; i++) {
-            let wp = wpList[i];
-            if (withinTolerance(pos, wp, tolerance)) {
-                if (debug === true) {
-                ChatLib.chat("&b[DEBUG:tick] Entered waypoint " + wp.name);}
-                ChatLib.say("at " + wp.name);
-                wp.triggered = true;
-            }
-        }
-    } else {
+    let wpList = profiles[activeProfile];
+    if (!wpList) {
+        if (debug) ChatLib.chat("&c[DEBUG:tick] No waypoints in profile " + activeProfile);
         return;
+    }
+
+    for (let i = 0; i < wpList.length; i++) {
+        let wp = wpList[i];
+        if (withinTolerance(pos, wp, tolerance)) {
+            if (debug) ChatLib.chat("&b[DEBUG:tick] Entered waypoint " + wp.name);
+            ChatLib.say("at " + wp.name);
+        }
     }
 });
 
 /* ------------------ Helpers ------------------ */
 function withinTolerance(p, wp, tol) {
     let now = Date.now();
-    let cooldown = 5000; // 5 seconds
+    let cooldown = 5000; // time in miliseconds
 
     let inRange =
         Math.abs(p.x - wp.x) <= tol &&
@@ -238,7 +250,9 @@ toggle_Y = 25 ,
 profile_Y = 50, 
 tolerance_Y = 75, 
 timer_Y = 100,
-debug_Y = 125;
+debug_Y = 125,
+alwaysOn_Y = 150; 
+
 
 function openDungeonMsgGUI() {
     if (debug === true) {
@@ -289,6 +303,13 @@ Renderer.drawRect(Renderer.color(50, 50, 50, 180), buttonX, debug_Y, buttonW, bu
 if (debugHovering) Renderer.drawRect(Renderer.color(255, 255, 255, 30), buttonX, debug_Y, buttonW, buttonH);
 Renderer.drawStringWithShadow("Debug Mode: " + (debug ? "§aON" : "§cOFF"), buttonX + 6, debug_Y + 6);
 });
+// Always On button
+const alwaysOnHovering = mouseX >= buttonX && mouseX <= buttonX + buttonW &&
+                         mouseY >= alwaysOn_Y && mouseY <= alwaysOn_Y + buttonH;
+
+Renderer.drawRect(Renderer.color(50, 50, 50, 180), buttonX, alwaysOn_Y, buttonW, buttonH);
+if (alwaysOnHovering) Renderer.drawRect(Renderer.color(255, 255, 255, 30), buttonX, alwaysOn_Y, buttonW, buttonH);
+Renderer.drawStringWithShadow("Always On: " + (alwaysOn ? "§aON" : "§cOFF"), buttonX + 6, alwaysOn_Y + 6);
 
 // gui interaction functionality
 gui.registerClicked(function(mouseX, mouseY, button) {
@@ -335,4 +356,12 @@ else if (mouseX >= buttonX && mouseX <= buttonX + buttonW &&
     saveAll();
     ChatLib.chat("&e[DungeonMsg] Debug set to: " + (debug ? "§aON" : "§cOFF"));
 }
+// Always On Button
+else if (mouseX >= buttonX && mouseX <= buttonX + buttonW &&
+         mouseY >= alwaysOn_Y && mouseY <= alwaysOn_Y + buttonH) {
+    alwaysOn = !alwaysOn;
+    ChatLib.chat("&e[DungeonMsg] Always On set to: " + (alwaysOn ? "§aON" : "§cOFF"));
+}
+
 })
+
