@@ -7,6 +7,7 @@ let config = {
     moduleEnabled: true,
     alwaysOn: false,
     bossActive: false,
+    maxorMessages: true,
 };
 let debug = config.debug;
 let tolerance = config.tolerance;
@@ -14,6 +15,7 @@ let cooldown = config.cooldown;
 let moduleEnabled = config.moduleEnabled;
 let alwaysOn = config.alwaysOn;
 let bossActive = config.bossActive;
+let maxorMessages = config.maxorMessages
 
 /* ------------------ Profile Loading ------------------ */
 const savePath = "DungeonMsg"; // folder in ./config/ChatTriggers/modules/
@@ -50,6 +52,7 @@ function loadAll() {
             moduleEnabled = config.moduleEnabled;
             alwaysOn = config.alwaysOn;
             bossActive = config.bossActive;
+            maxorMessages = config.maxorMessages
             if (debug === true) {
                 ChatLib.chat("&d[DEBUG:loadAll] Loaded profiles + config");
             }
@@ -82,7 +85,7 @@ ChatLib.chat("&d[DEBUG:init] Module loaded and globals set");
 register("command", function(...args) {
     if (args[0] === "active") {
         bossActive = !bossActive;
-        ChatLib.chat("&e[DungeonMsg] Always On set to: " + (bossActive ? "§aON" : "§cOFF"));
+        ChatLib.chat("&e[DungeonMsg] Boss State set to: " + (bossActive ? "§aON" : "§cOFF"));
     } else if (args[0] === "add") {
         addWaypoint(...args);
     } else if (args[0] === "print") {
@@ -182,29 +185,43 @@ function removeWaypoint(blank, indexStr) {
 
 
 /* ------------------ Boss detection ------------------ */
-register("chat", (player, event) => {
-    bossActive = true
-  if (debug) ChatLib.chat("&c[DEBUG:dectect] Maxor message detected");
-}).setCriteria("[BOSS] Maxor:").setContains();
+register("chat", (event) => {
+    let raw = ChatLib.removeFormatting(ChatLib.getChatMessage(event));
 
-register("chat", (player, event) => {
-    bossActive = true
-  if (debug) ChatLib.chat("&c[DEBUG:detect] Crystal message detected");
-}).setCriteria("picked up Energy Crystal!").setContains();
-
-register("renderBossHealth", () => {
-    let bossName = Renderer.getBossHealth();
-    if (bossName && bossName.includes("Maxor")) {
+    if (raw.includes("[BOSS] Maxor:")) {
         bossActive = true;
-        if (debug) ChatLib.chat("&d[DEBUG] Boss detected from bossbar: " + bossName);
-    }
-});
+        if (debug) ChatLib.chat("&c[DEBUG:detect] Maxor message detected: " + raw);
 
+        if (maxorMessages == false) {cancel(event);} // hide Maxor's dialog from chat
+    }
+}).setCriteria("${*}"); // catch all, we filter inside
+
+register("chat", (event) => {
+    let raw = ChatLib.removeFormatting(ChatLib.getChatMessage(event));
+
+    if (raw.includes("picked up Energy Crystal!")) {
+        bossActive = true;
+        if (debug) ChatLib.chat("&c[DEBUG:detect] Crystal message detected: " + raw);
+        // do NOT cancel here, crystal message still shows
+    }
+}).setCriteria("${*}");
+
+/*
+// Not currently working, keeping for future bossbar detection
+// register("renderBossHealth", () => {
+//     let bossName = Renderer.getBossHealth();
+//     if (bossName && bossName.includes("Maxor")) {
+//         bossActive = true;
+//         if (debug) ChatLib.chat("&d[DEBUG] Boss detected from bossbar: " + bossName);
+//     }
+// });
+*/
 
 register("worldLoad", () => {
     bossActive = false;
-    if (debug) ChatLib.chat("&d[DEBUG] Server swap detected");
+    if (debug) ChatLib.chat("&d[DEBUG] Server swap detected, boss reset");
 });
+
 
 
 /* ------------------ Waypoint Detection ------------------ */
@@ -259,10 +276,12 @@ const buttonX = 10,
     buttonH = 22,
     toggle_Y = 25,
     profile_Y = 50,
-    tolerance_Y = 75,
-    timer_Y = 100,
-    debug_Y = 125,
-    alwaysOn_Y = 150;
+    tolerance_Y = 100,
+    timer_Y = 125,
+    debug_Y = 175,
+    alwaysOn_Y = 150,
+    maxorMessages_Y = 75
+    ;
 
 function openDungeonMsgGUI() {
     if (debug === true) {
@@ -321,6 +340,14 @@ gui.registerDraw(function(mouseX, mouseY, partialTicks) {
     Renderer.drawRect(Renderer.color(50, 50, 50, 180), buttonX, alwaysOn_Y, buttonW, buttonH);
     if (alwaysOnHovering) Renderer.drawRect(Renderer.color(255, 255, 255, 30), buttonX, alwaysOn_Y, buttonW, buttonH);
     Renderer.drawStringWithShadow("Always On: " + (alwaysOn ? "§aON" : "§cOFF"), buttonX + 6, alwaysOn_Y + 6);
+
+     // Maxor button
+    const maxorMessagesHovering = mouseX >= buttonX && mouseX <= buttonX + buttonW &&
+        mouseY >= maxorMessages_Y && mouseY <= maxorMessages_Y + buttonH;
+
+    Renderer.drawRect(Renderer.color(50, 50, 50, 180), buttonX, maxorMessages_Y, buttonW, buttonH);
+    if (maxorMessagesHovering) Renderer.drawRect(Renderer.color(255, 255, 255, 30), buttonX, maxorMessages_Y, buttonW, buttonH);
+    Renderer.drawStringWithShadow("Maxor Messages: " + (maxorMessages ? "§aON" : "§cOFF"), buttonX + 6, maxorMessages_Y + 6);
 });
 
 // gui interaction functionality
@@ -377,5 +404,13 @@ gui.registerClicked(function(mouseX, mouseY, button) {
         config.alwaysOn = alwaysOn; // Save to config
         saveAll();
         ChatLib.chat("&e[DungeonMsg] Always On set to: " + (alwaysOn ? "§aON" : "§cOFF"));
+        }
+      // Always On Button
+    else if (mouseX >= buttonX && mouseX <= buttonX + buttonW &&
+        mouseY >= maxorMessages_Y && mouseY <= maxorMessages_Y + buttonH) {
+        maxorMessages = !maxorMessages;
+        config.maxorMessages = maxorMessages; // Save to config
+        saveAll();
+        ChatLib.chat("&e[DungeonMsg] Maxor Messages: " + (maxorMessages ? "§aON" : "§cOFF"));
     }
 })
