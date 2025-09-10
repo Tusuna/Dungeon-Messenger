@@ -43,6 +43,9 @@
   "config": {
     "tolerance": 3,
     "cooldown": 6000,
-    "debug": false
+    "debug": false,
+    "alwaysOn": false,
+    "maxorMessages": true,
+    "moduleEnabled": false
   }
 }
