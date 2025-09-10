@@ -81,8 +81,8 @@ ChatLib.chat("&d[DEBUG:init] Module loaded and globals set");
 /* ------------------ Commands ------------------ */
 register("command", function(...args) {
     if (args[0] === "active") {
-        bossActive = true;
-        ChatLib.chat("&a[DungeonMsg] Manually set boss as active!");
+        bossActive = !bossActive;
+        ChatLib.chat("&e[DungeonMsg] Always On set to: " + (bossActive ? "§aON" : "§cOFF"));
     } else if (args[0] === "add") {
         addWaypoint(...args);
     } else if (args[0] === "print") {
@@ -182,22 +182,26 @@ function removeWaypoint(blank, indexStr) {
 
 
 /* ------------------ Boss detection ------------------ */
-register("chat", (msg) => {
-    if (msg.includes("picked up Energy Crstal!") || msg.includes("[BOSS] Maxor:")) {
+register("chat", (player, event) => {
+    bossActive = true
+  if (debug) ChatLib.chat("&c[DEBUG:dectect] Maxor message detected");
+}).setCriteria("[BOSS] Maxor:").setContains();
+
+register("chat", (player, event) => {
+    bossActive = true
+  if (debug) ChatLib.chat("&c[DEBUG:detect] Crystal message detected");
+}).setCriteria("picked up Energy Crystal!").setContains();
+
+register("renderBossHealth", () => {
+    let bossName = Renderer.getBossHealth();
+    if (bossName && bossName.includes("Maxor")) {
         bossActive = true;
-        if (debug) ChatLib.chat("&d[DEBUG] Boss detected from chat:" + msg);
+        if (debug) ChatLib.chat("&d[DEBUG] Boss detected from bossbar: " + bossName);
     }
 });
 
-register("renderOverlay", 90 => {
-    let bar = bossbar.getName();
-    if (bar && bar.includes("Maxor")) {
-        bossActive = true;
-        if (debug) ChatLib.chat("&d[DEBUG] Boss detected from bossbar");
-    }
-});
 
-register("serverConnect", () => {
+register("worldLoad", () => {
     bossActive = false;
     if (debug) ChatLib.chat("&d[DEBUG] Server swap detected");
 });
