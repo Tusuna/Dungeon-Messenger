@@ -1,18 +1,19 @@
-/// <reference lib="es2015" />
-
 /* ------------------ Global State ------------------ */
-let enabled = true;
 let activeProfile = "Default";
 let config = {
     tolerance: 2,
     cooldown: 5000,
-    debug: false
+    debug: false,
+    moduleEnabled: true,
+    alwaysOn: false,
+    bossActive: false,
 };
 let debug = config.debug;
 let tolerance = config.tolerance;
 let cooldown = config.cooldown;
-
-
+let moduleEnabled = config.moduleEnabled;
+let alwaysOn = config.alwaysOn;
+let bossActive = config.bossActive;
 
 /* ------------------ Profile Loading ------------------ */
 const savePath = "DungeonMsg"; // folder in ./config/ChatTriggers/modules/
@@ -24,14 +25,14 @@ function saveAll() {
             config: config
         }, null, 2));
         if (debug === true) {
-        ChatLib.chat("&d[DEBUG:saveAll] Saved profiles + config");}
+            ChatLib.chat("&d[DEBUG:saveAll] Saved profiles + config");
+        }
     } catch (e) {
         if (debug === true) {
-        ChatLib.chat("&c[DEBUG:saveAll] Failed to save: " + e);}
+            ChatLib.chat("&c[DEBUG:saveAll] Failed to save: " + e);
+        }
     }
 }
-
-
 
 function loadAll() {
     try {
@@ -46,15 +47,21 @@ function loadAll() {
             tolerance = config.tolerance;
             cooldown = config.cooldown;
             debug = config.debug;
+            moduleEnabled = config.moduleEnabled;
+            alwaysOn = config.alwaysOn;
+            bossActive = config.bossActive;
             if (debug === true) {
-            ChatLib.chat("&d[DEBUG:loadAll] Loaded profiles + config");}
+                ChatLib.chat("&d[DEBUG:loadAll] Loaded profiles + config");
+            }
         } else {
             if (debug === true) {
-            ChatLib.chat("&e[DEBUG:loadAll] No saved file, starting fresh");}
+                ChatLib.chat("&e[DEBUG:loadAll] No saved file, starting fresh");
+            }
         }
     } catch (e) {
         if (debug === true) {
-        ChatLib.chat("&c[DEBUG:loadAll] Failed to load: " + e);}
+            ChatLib.chat("&c[DEBUG:loadAll] Failed to load: " + e);
+        }
     }
 }
 
@@ -74,30 +81,28 @@ ChatLib.chat("&d[DEBUG:init] Module loaded and globals set");
 /* ------------------ Commands ------------------ */
 register("command", function(...args) {
     if (args[0] === "active") {
-        enabled = true;
-        ChatLib.chat("&a[DungeonMsg] Manually set boss as active!");
-    }   else if (args[0] === "add") {
+        bossActive = !bossActive;
+        ChatLib.chat("&e[DungeonMsg] Always On set to: " + (bossActive ? "§aON" : "§cOFF"));
+    } else if (args[0] === "add") {
         addWaypoint(...args);
-    }
-        else if (args[0] === "print") {
+    } else if (args[0] === "print") {
         printWaypoints();
-    } 
-        else if (args[0] === "remove") {
+    } else if (args[0] === "remove") {
         removeWaypoint(...args)
+    } else if (args[0] === "debugsave") {
+        if (debug === true) {
+            ChatLib.chat("&d[DEBUG] Profiles in memory: " + JSON.stringify(profiles));
         }
-        else if (args[0] === "debugsave") {
-            if (debug === true) {
-        ChatLib.chat("&d[DEBUG] Profiles in memory: " + JSON.stringify(profiles));}
         saveAll();
-}
-        else {
+    } else {
         openDungeonMsgGUI();
     }
 }).setName("dmsg");
 
 function openDungeonMsgGUI() {
     if (debug === true) {
-    ChatLib.chat("&d[DEBUG:openDungeonMsgGUI] Opening GUI");}
+        ChatLib.chat("&d[DEBUG:openDungeonMsgGUI] Opening GUI");
+    }
     gui.open();
 }
 
@@ -110,7 +115,7 @@ function printWaypoints() {
     ChatLib.chat("&b[DungeonMsg] Waypoints in " + activeProfile + ":");
     wpList.forEach((wp, i) => {
         ChatLib.chat("&7" + (i + 1) + ". " + wp.name +
-                     " (" + wp.x + ", " + wp.y + ", " + wp.z + ")");
+            " (" + wp.x + ", " + wp.y + ", " + wp.z + ")");
     });
 }
 
@@ -168,59 +173,75 @@ function removeWaypoint(blank, indexStr) {
         return;
     }
 
-    // Adjust index (shifts array to make first waypoint 1 for player)
     let removed = wpList.splice(index - 1, 1)[0];
-ChatLib.chat("&a[DungeonMsg] Removed waypoint #" + index + ": " + removed.name)
     saveAll();
 
-
-
     ChatLib.chat("&a[DungeonMsg] Removed waypoint #" + index + ": " + removed.name +
-                 " (" + removed.x + ", " + removed.y + ", " + removed.z + ")");
+        " (" + removed.x + ", " + removed.y + ", " + removed.z + ")");
 }
 
 
-/* ------------------ Detect Boss Start ------------------ */
-// TODO: figure out when tigger i can use for boss start 
-// currently boss is set to always active
+/* ------------------ Boss detection ------------------ */
+register("chat", (player, event) => {
+    bossActive = true
+  if (debug) ChatLib.chat("&c[DEBUG:dectect] Maxor message detected");
+}).setCriteria("[BOSS] Maxor:").setContains();
+
+register("chat", (player, event) => {
+    bossActive = true
+  if (debug) ChatLib.chat("&c[DEBUG:detect] Crystal message detected");
+}).setCriteria("picked up Energy Crystal!").setContains();
+
+register("renderBossHealth", () => {
+    let bossName = Renderer.getBossHealth();
+    if (bossName && bossName.includes("Maxor")) {
+        bossActive = true;
+        if (debug) ChatLib.chat("&d[DEBUG] Boss detected from bossbar: " + bossName);
+    }
+});
+
+
+register("worldLoad", () => {
+    bossActive = false;
+    if (debug) ChatLib.chat("&d[DEBUG] Server swap detected");
+});
+
 
 /* ------------------ Waypoint Detection ------------------ */
 register("tick", function() {
-    if (enabled === true) {
-        let pos = { x: Math.floor(Player.getX()), y: Math.floor(Player.getY()), z: Math.floor(Player.getZ()) };
+    if (!(moduleEnabled && (alwaysOn || bossActive))) return;
 
-        let wpList = profiles[activeProfile];
-        if (!wpList) {
-            if (debug === true) {
-            ChatLib.chat("&c[DEBUG:tick] No waypoints in profile " + activeProfile);}
-            return;
-        }
+    let pos = {
+        x: Math.floor(Player.getX()),
+        y: Math.floor(Player.getY()),
+        z: Math.floor(Player.getZ())
+    };
 
-        for (let i = 0; i < wpList.length; i++) {
-            let wp = wpList[i];
-            if (withinTolerance(pos, wp, tolerance)) {
-                if (debug === true) {
-                ChatLib.chat("&b[DEBUG:tick] Entered waypoint " + wp.name);}
-                ChatLib.say("at " + wp.name);
-                wp.triggered = true;
-            }
-        }
-    } else {
+    let wpList = profiles[activeProfile];
+    if (!wpList) {
+        if (debug) ChatLib.chat("&c[DEBUG:tick] No waypoints in profile " + activeProfile);
         return;
+    }
+
+    for (let i = 0; i < wpList.length; i++) {
+        let wp = wpList[i];
+        if (withinTolerance(pos, wp, tolerance)) {
+            if (debug) ChatLib.chat("&b[DEBUG:tick] Entered waypoint " + wp.name);
+            ChatLib.say("at " + wp.name);
+        }
     }
 });
 
 /* ------------------ Helpers ------------------ */
 function withinTolerance(p, wp, tol) {
     let now = Date.now();
-    let cooldown = 5000; // 5 seconds
+    // Cooldown is now a global variable, no need to redefine it
+    let offCooldown = (now - wp.lastTriggered) >= cooldown;
 
     let inRange =
         Math.abs(p.x - wp.x) <= tol &&
         Math.abs(p.y - wp.y) <= tol &&
         Math.abs(p.z - wp.z) <= tol;
-
-    let offCooldown = (now - wp.lastTriggered) >= cooldown;
 
     if (inRange && offCooldown) {
         wp.lastTriggered = now; // reset cooldown
@@ -233,106 +254,128 @@ function withinTolerance(p, wp, tol) {
 let gui = new Gui();
 
 //  button geometry (size and x are same for every button)
-const buttonX = 10, buttonW = 110, buttonH = 22, 
-toggle_Y = 25 ,
-profile_Y = 50, 
-tolerance_Y = 75, 
-timer_Y = 100,
-debug_Y = 125;
+const buttonX = 10,
+    buttonW = 110,
+    buttonH = 22,
+    toggle_Y = 25,
+    profile_Y = 50,
+    tolerance_Y = 75,
+    timer_Y = 100,
+    debug_Y = 125,
+    alwaysOn_Y = 150;
 
 function openDungeonMsgGUI() {
     if (debug === true) {
-  ChatLib.chat("&d[DEBUG:openDungeonMsgGUI] Opening GUI");}
-  gui.open();
+        ChatLib.chat("&d[DEBUG:openDungeonMsgGUI] Opening GUI");
+    }
+    gui.open();
 }
 
 gui.registerDraw(function(mouseX, mouseY, partialTicks) {
-  Renderer.drawStringWithShadow("§bDungeonMsg Config", 10, 10);
+    Renderer.drawStringWithShadow("§bDungeonMsg Config", 10, 10);
 
-  // Toggle Button 
-  const toggleHovering = mouseX >= buttonX && mouseX <= buttonX + buttonW &&
-                   mouseY >= toggle_Y && mouseY <= toggle_Y + buttonH;
+    // Toggle Button 
+    const toggleHovering = mouseX >= buttonX && mouseX <= buttonX + buttonW &&
+        mouseY >= toggle_Y && mouseY <= toggle_Y + buttonH;
 
-  Renderer.drawRect(Renderer.color(50, 50, 50, 180), buttonX, toggle_Y, buttonW, buttonH);
-  if (toggleHovering) Renderer.drawRect(Renderer.color(255, 255, 255, 30), buttonX, toggle_Y, buttonW, buttonH);
-  Renderer.drawStringWithShadow("Toggle: " + (enabled ? "§aON" : "§cOFF"), buttonX + 6, toggle_Y + 6);
+    Renderer.drawRect(Renderer.color(50, 50, 50, 180), buttonX, toggle_Y, buttonW, buttonH);
+    if (toggleHovering) Renderer.drawRect(Renderer.color(255, 255, 255, 30), buttonX, toggle_Y, buttonW, buttonH);
+    Renderer.drawStringWithShadow("Toggle: " + (moduleEnabled ? "§aON" : "§cOFF"), buttonX + 6, toggle_Y + 6);
 
     // Profile Button
-  const profileHovering = mouseX >= buttonX && mouseX <= buttonX + buttonW &&
-                   mouseY >= profile_Y && mouseY <= profile_Y + buttonH;
+    const profileHovering = mouseX >= buttonX && mouseX <= buttonX + buttonW &&
+        mouseY >= profile_Y && mouseY <= profile_Y + buttonH;
 
-  Renderer.drawRect(Renderer.color(50, 50, 50, 180), buttonX, profile_Y, buttonW, buttonH);
-  if (profileHovering) Renderer.drawRect(Renderer.color(255, 255, 255, 30), buttonX, profile_Y, buttonW, buttonH);
-  Renderer.drawStringWithShadow("Profile: " + activeProfile, buttonX + 6, profile_Y + 6);
+    Renderer.drawRect(Renderer.color(50, 50, 50, 180), buttonX, profile_Y, buttonW, buttonH);
+    if (profileHovering) Renderer.drawRect(Renderer.color(255, 255, 255, 30), buttonX, profile_Y, buttonW, buttonH);
+    Renderer.drawStringWithShadow("Profile: " + activeProfile, buttonX + 6, profile_Y + 6);
 
-// Tolerance Button
-  const toleranceHovering = mouseX >= buttonX && mouseX <= buttonX + buttonW &&
-                   mouseY >= tolerance_Y && mouseY <= tolerance_Y + buttonH;
+    // Tolerance Button
+    const toleranceHovering = mouseX >= buttonX && mouseX <= buttonX + buttonW &&
+        mouseY >= tolerance_Y && mouseY <= tolerance_Y + buttonH;
 
-  Renderer.drawRect(Renderer.color(50, 50, 50, 180), buttonX, tolerance_Y, buttonW, buttonH);
-  if (toleranceHovering) Renderer.drawRect(Renderer.color(255, 255, 255, 30), buttonX, tolerance_Y, buttonW, buttonH);
-  Renderer.drawStringWithShadow("Tolerance: " + tolerance + " blocks", buttonX + 6, tolerance_Y + 6);
+    Renderer.drawRect(Renderer.color(50, 50, 50, 180), buttonX, tolerance_Y, buttonW, buttonH);
+    if (toleranceHovering) Renderer.drawRect(Renderer.color(255, 255, 255, 30), buttonX, tolerance_Y, buttonW, buttonH);
+    Renderer.drawStringWithShadow("Tolerance: " + tolerance + " blocks", buttonX + 6, tolerance_Y + 6);
 
-// Timer Button
-const timerHovering = mouseX >= buttonX && mouseX <= buttonX + buttonW &&
-                      mouseY >= timer_Y && mouseY <= timer_Y + buttonH;
+    // Timer Button
+    const timerHovering = mouseX >= buttonX && mouseX <= buttonX + buttonW &&
+        mouseY >= timer_Y && mouseY <= timer_Y + buttonH;
 
-Renderer.drawRect(Renderer.color(50, 50, 50, 180), buttonX, timer_Y, buttonW, buttonH);
-if (timerHovering) Renderer.drawRect(Renderer.color(255, 255, 255, 30), buttonX, timer_Y, buttonW, buttonH);
-Renderer.drawStringWithShadow("Timer: " + (cooldown / 1000) + " seconds", buttonX + 6, timer_Y + 6);
+    Renderer.drawRect(Renderer.color(50, 50, 50, 180), buttonX, timer_Y, buttonW, buttonH);
+    if (timerHovering) Renderer.drawRect(Renderer.color(255, 255, 255, 30), buttonX, timer_Y, buttonW, buttonH);
+    Renderer.drawStringWithShadow("Timer: " + (cooldown / 1000) + " seconds", buttonX + 6, timer_Y + 6);
 
-// Debug Button 
-const debugHovering = mouseX >= buttonX && mouseX <= buttonX + buttonW &&
-                      mouseY >= debug_Y && mouseY <= debug_Y + buttonH;
+    // Debug Button 
+    const debugHovering = mouseX >= buttonX && mouseX <= buttonX + buttonW &&
+        mouseY >= debug_Y && mouseY <= debug_Y + buttonH;
 
-Renderer.drawRect(Renderer.color(50, 50, 50, 180), buttonX, debug_Y, buttonW, buttonH);
-if (debugHovering) Renderer.drawRect(Renderer.color(255, 255, 255, 30), buttonX, debug_Y, buttonW, buttonH);
-Renderer.drawStringWithShadow("Debug Mode: " + (debug ? "§aON" : "§cOFF"), buttonX + 6, debug_Y + 6);
+    Renderer.drawRect(Renderer.color(50, 50, 50, 180), buttonX, debug_Y, buttonW, buttonH);
+    if (debugHovering) Renderer.drawRect(Renderer.color(255, 255, 255, 30), buttonX, debug_Y, buttonW, buttonH);
+    Renderer.drawStringWithShadow("Debug Mode: " + (debug ? "§aON" : "§cOFF"), buttonX + 6, debug_Y + 6);
+
+    // Always On button
+    const alwaysOnHovering = mouseX >= buttonX && mouseX <= buttonX + buttonW &&
+        mouseY >= alwaysOn_Y && mouseY <= alwaysOn_Y + buttonH;
+
+    Renderer.drawRect(Renderer.color(50, 50, 50, 180), buttonX, alwaysOn_Y, buttonW, buttonH);
+    if (alwaysOnHovering) Renderer.drawRect(Renderer.color(255, 255, 255, 30), buttonX, alwaysOn_Y, buttonW, buttonH);
+    Renderer.drawStringWithShadow("Always On: " + (alwaysOn ? "§aON" : "§cOFF"), buttonX + 6, alwaysOn_Y + 6);
 });
 
 // gui interaction functionality
 gui.registerClicked(function(mouseX, mouseY, button) {
-  // Toggle button
-  if (mouseX >= buttonX && mouseX <= buttonX + buttonW &&
-      mouseY >= toggle_Y && mouseY <= toggle_Y + buttonH) {
-    enabled = !enabled;
-    ChatLib.chat("&e[DungeonMsg] Enabled set to: " + (enabled ? "§aON" : "§cOFF"));
-  }
+    // Toggle button
+    if (mouseX >= buttonX && mouseX <= buttonX + buttonW &&
+        mouseY >= toggle_Y && mouseY <= toggle_Y + buttonH) {
+        moduleEnabled = !moduleEnabled;
+        config.moduleEnabled = moduleEnabled; // Save to config
+        saveAll();
+        ChatLib.chat("&e[DungeonMsg] Enabled set to: " + (moduleEnabled ? "§aON" : "§cOFF"));
+    }
 
-  // Profile button: cycle through profiles
-  else if (mouseX >= buttonX && mouseX <= buttonX + buttonW &&
-           mouseY >= profile_Y && mouseY <= profile_Y + buttonH) {
-    let keys = Object.keys(profiles);
-    let idx = keys.indexOf(activeProfile);
-    activeProfile = keys[(idx + 1) % keys.length]; // cycle forward
-    ChatLib.chat("&e[DungeonMsg] Active profile set to: §b" + activeProfile);
-  }
+    // Profile button: cycle through profiles
+    else if (mouseX >= buttonX && mouseX <= buttonX + buttonW &&
+        mouseY >= profile_Y && mouseY <= profile_Y + buttonH) {
+        let keys = Object.keys(profiles);
+        let idx = keys.indexOf(activeProfile);
+        activeProfile = keys[(idx + 1) % keys.length]; // cycle forward
+        ChatLib.chat("&e[DungeonMsg] Active profile set to: §b" + activeProfile);
+    }
 
-// Tolerance button
-else if (mouseX >= buttonX && mouseX <= buttonX + buttonW &&
-         mouseY >= tolerance_Y && mouseY <= tolerance_Y + buttonH) {
-    tolerance++;
-    if (tolerance > 10) tolerance = 1;
-    config.tolerance = tolerance;
-    saveAll();
-    ChatLib.chat("&e[DungeonMsg] Tolerance set to: §b" + tolerance + " blocks");
-}
+    // Tolerance button
+    else if (mouseX >= buttonX && mouseX <= buttonX + buttonW &&
+        mouseY >= tolerance_Y && mouseY <= tolerance_Y + buttonH) {
+        tolerance++;
+        if (tolerance > 10) tolerance = 1;
+        config.tolerance = tolerance;
+        saveAll();
+        ChatLib.chat("&e[DungeonMsg] Tolerance set to: §b" + tolerance + " blocks");
+    }
 
-// Timer button
-else if (mouseX >= buttonX && mouseX <= buttonX + buttonW &&
-         mouseY >= timer_Y && mouseY <= timer_Y + buttonH) {
-    cooldown += 1000;
-    if (cooldown > 10000) cooldown = 1000;
-    config.cooldown = cooldown;
-    saveAll();
-    ChatLib.chat("&e[DungeonMsg] Timer set to: §b" + (cooldown / 1000) + " seconds");
-}
-// Debug button
-else if (mouseX >= buttonX && mouseX <= buttonX + buttonW &&
-         mouseY >= debug_Y && mouseY <= debug_Y + buttonH) {
-    debug = !debug;
-    config.debug = debug;
-    saveAll();
-    ChatLib.chat("&e[DungeonMsg] Debug set to: " + (debug ? "§aON" : "§cOFF"));
-}
+    // Timer button
+    else if (mouseX >= buttonX && mouseX <= buttonX + buttonW &&
+        mouseY >= timer_Y && mouseY <= timer_Y + buttonH) {
+        cooldown += 1000;
+        if (cooldown > 10000) cooldown = 1000;
+        config.cooldown = cooldown;
+        saveAll();
+        ChatLib.chat("&e[DungeonMsg] Timer set to: §b" + (cooldown / 1000) + " seconds");
+    }
+    // Debug button
+    else if (mouseX >= buttonX && mouseX <= buttonX + buttonW &&
+        mouseY >= debug_Y && mouseY <= debug_Y + buttonH) {
+        debug = !debug;
+        config.debug = debug;
+        saveAll();
+        ChatLib.chat("&e[DungeonMsg] Debug set to: " + (debug ? "§aON" : "§cOFF"));
+    }
+    // Always On Button
+    else if (mouseX >= buttonX && mouseX <= buttonX + buttonW &&
+        mouseY >= alwaysOn_Y && mouseY <= alwaysOn_Y + buttonH) {
+        alwaysOn = !alwaysOn;
+        config.alwaysOn = alwaysOn; // Save to config
+        saveAll();
+        ChatLib.chat("&e[DungeonMsg] Always On set to: " + (alwaysOn ? "§aON" : "§cOFF"));
+    }
 })
