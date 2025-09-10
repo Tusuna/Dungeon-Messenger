@@ -20,10 +20,8 @@ Current commands:
 /dmsg add 'x' 'y' 'z' 'name' - adds waypoint to current profile (if cords ommited uses player pos)
 /dmsg print - prints all waypoint in profile and their indecies
 /dmsg remove 'indecie' - removes specified waypoint
+/dmsg active - sets the boss to active (will be overwritten by world loads, use alwayson setting to prevent)
 
 TODO:
-- Boss detection*, currently in testing
+- Boss detection*, only detects maxor chat messages, planned to detect bossbar or other checks to ensure accuracy
 - Setup default profile waypoints, semi done - need more waypoints*
-- come up with better name
-
-
