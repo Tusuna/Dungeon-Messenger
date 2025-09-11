@@ -103,6 +103,7 @@ register("command", function(...args) {
     }
 }).setName("dmsg");
 
+//TPS Command
 let tickCount = 0;
 let tpsStart = 0;
 
@@ -124,7 +125,7 @@ register("tick", () => {
     if (tpsStart > 0) tickCount++;
 });
 
-
+// /dmsg command functions
 function openDungeonMsgGUI() {
     if (debug === true) {
         ChatLib.chat("&d[DEBUG:openDungeonMsgGUI] Opening GUI");
@@ -278,12 +279,14 @@ function withinTolerance(p, wp, tol) {
     return false;
 }
 
-/* ------------------ I4 Module ------------------ */
+/* ------------------ I4 Detector ------------------ */
 let iFourActive = false;
 let iFourStart = false;
 let iFourComplete = false;
-let iFourPlate = { x: 100, y: 120, z: 130 }; // replace with real coords
-let iFourTol = 1; // tolerance around plate
+
+// placeholder coords, update to the real I4 pressure plate coords
+let iFourPlate = { x: -16, y: 5, z: 14 };
+let iFourTol = 3; // how close to plate counts as "on it"
 
 register("chat", (player, event) => {
      completedTerms += 1
@@ -291,8 +294,8 @@ register("chat", (player, event) => {
 }).setCriteria("completed a terminal!").setContains();
 
 register("tick", () => {
-    if (!(bossActive && moduleEnabled && i4)) return;
-    if (compeltedTerms >= 9) {Chat.say("i4 incomplete");
+    
+    if (!(bossActive && moduleEnabled) || (iFourComplete)) return;
     let px = Math.floor(Player.getX());
     let py = Math.floor(Player.getY());
     let pz = Math.floor(Player.getZ());
@@ -306,13 +309,27 @@ register("tick", () => {
         iFourActive = true;
         iFourStart = true;
         iFourComplete = false;
-        ChatLib.chat("&e[DungeonMsg] §bI4 Started");
+        ChatLib.chat("&e[DungeonMsg] §bI4 Started at (" + px + ", " + py + ", " + pz + ")");
+        if (debug) ChatLib.chat("&d[DEBUG:I4] Entered plate coords: " + JSON.stringify(iFourPlate));
     }
 
     if (!onPlate && iFourActive && !iFourComplete) {
         // left plate without completing
         iFourActive = false;
         ChatLib.chat("&e[DungeonMsg] §cI4 Failed");
+        if (debug) ChatLib.chat("&d[DEBUG:I4] Player left plate before completion or died");
+    }
+
+    if (completedTerms >= 9) {
+        // left plate without completing
+        iFourActive = false;
+        iFourComplete = true;
+        ChatLib.chat("&e[DungeonMsg] §cI4 Incomplete");
+        if (debug) ChatLib.chat("&d[DEBUG:I4] Too many terminals completed");
+    }
+
+    if (debug && iFourActive) {
+        Renderer.drawStringWithShadow("§d[I4 DEBUG] Active | Pos: " + px + "," + py + "," + pz, 10, 200);
     }
 });
 
@@ -324,8 +341,25 @@ register("chat", (event) => {
         iFourComplete = true;
         iFourActive = false;
         ChatLib.chat("&e[DungeonMsg] §aI4 Complete");
+        if (debug) ChatLib.chat("&d[DEBUG:I4] Detected completion message: " + raw);
     }
 }).setCriteria("${*}");
+
+/* ------------------ Debug Commands ------------------ */
+register("command", () => {
+    ChatLib.chat("&b[I4 Debug] Current Plate: " + JSON.stringify(iFourPlate));
+    ChatLib.chat("&b[I4 Debug] Active: " + iFourActive + " | Started: " + iFourStart + " | Complete: " + iFourComplete);
+    ChatLib.chat("&b[I4 Debug] BossActive: " + bossActive);
+}).setName("i4debug");
+
+register("command", (x, y, z) => {
+    if (!x || !y || !z) {
+        ChatLib.chat("&cUsage: /i4set <x> <y> <z>");
+        return;
+    }
+    iFourPlate = { x: parseInt(x), y: parseInt(y), z: parseInt(z) };
+    ChatLib.chat("&e[I4 Debug] Plate set to: " + JSON.stringify(iFourPlate));
+}).setName("i4set");
 
 
 /* ------------------ GUI ------------------ */
@@ -464,6 +498,7 @@ gui.registerClicked(function(mouseX, mouseY, button) {
         config.alwaysOn = alwaysOn; // Save to config
         saveAll();
         ChatLib.chat("&e[DungeonMsg] Always On set to: " + (alwaysOn ? "§aON" : "§cOFF"));
+    }
     // i4 button
     if (mouseX >= buttonX && mouseX <= buttonX + buttonW &&
         mouseY >= i4_Y && mouseY <= i4_Y + buttonH) {
@@ -472,6 +507,4 @@ gui.registerClicked(function(mouseX, mouseY, button) {
         saveAll();
         ChatLib.chat("&e[DungeonMsg] i4 set to: " + (i4 ? "§aON" : "§cOFF"));
     }
-    }
 })
-
