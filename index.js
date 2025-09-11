@@ -7,6 +7,7 @@ let config = {
     moduleEnabled: true,
     alwaysOn: false,
     bossActive: false,
+    i4: false
 };
 let debug = config.debug;
 let tolerance = config.tolerance;
@@ -14,6 +15,8 @@ let cooldown = config.cooldown;
 let moduleEnabled = config.moduleEnabled;
 let alwaysOn = config.alwaysOn;
 let bossActive = config.bossActive;
+let i4 = config.i4
+let completedTerms = 0
 
 /* ------------------ Profile Loading ------------------ */
 const savePath = "DungeonMsg"; // folder in ./config/ChatTriggers/modules/
@@ -50,6 +53,7 @@ function loadAll() {
             moduleEnabled = config.moduleEnabled;
             alwaysOn = config.alwaysOn;
             bossActive = config.bossActive;
+            i4 = config.i4
             if (debug === true) {
                 ChatLib.chat("&d[DEBUG:loadAll] Loaded profiles + config");
             }
@@ -98,6 +102,28 @@ register("command", function(...args) {
         openDungeonMsgGUI();
     }
 }).setName("dmsg");
+
+let tickCount = 0;
+let tpsStart = 0;
+
+register("command", function() {
+    tickCount = 0;
+    tpsStart = Date.now();
+
+    // Measure for 3 seconds
+    setTimeout(() => {
+        let duration = (Date.now() - tpsStart) / 1000; // seconds
+        let tps = (tickCount / duration).toFixed(2);
+        ChatLib.chat("&e[DungeonMsg] Server TPS: §a" + tps);
+    }, 3000);
+
+    ChatLib.chat("&e[DungeonMsg] Measuring TPS...");
+}).setName("tps");
+
+register("tick", () => {
+    if (tpsStart > 0) tickCount++;
+});
+
 
 function openDungeonMsgGUI() {
     if (debug === true) {
@@ -181,6 +207,7 @@ function removeWaypoint(blank, indexStr) {
 }
 
 
+
 /* ------------------ Boss detection ------------------ */
 register("chat", (player, event) => {
     bossActive = true
@@ -192,17 +219,18 @@ register("chat", (player, event) => {
   if (debug) ChatLib.chat("&c[DEBUG:detect] Crystal message detected");
 }).setCriteria("picked up Energy Crystal!").setContains();
 
-register("renderBossHealth", () => {
-    let bossName = Renderer.getBossHealth();
-    if (bossName && bossName.includes("Maxor")) {
-        bossActive = true;
-        if (debug) ChatLib.chat("&d[DEBUG] Boss detected from bossbar: " + bossName);
-    }
-});
+//register("renderBossHealth", () => {
+//    let bossName = Renderer.getBossHealth();
+//    if (bossName && bossName.includes("Maxor")) {
+//        bossActive = true;
+//        if (debug) ChatLib.chat("&d[DEBUG] Boss detected from bossbar: " + bossName);
+//    }
+//});
 
 
 register("worldLoad", () => {
     bossActive = false;
+    completedTerms = 0
     if (debug) ChatLib.chat("&d[DEBUG] Server swap detected");
 });
 
@@ -250,6 +278,56 @@ function withinTolerance(p, wp, tol) {
     return false;
 }
 
+/* ------------------ I4 Module ------------------ */
+let iFourActive = false;
+let iFourStart = false;
+let iFourComplete = false;
+let iFourPlate = { x: 100, y: 120, z: 130 }; // replace with real coords
+let iFourTol = 1; // tolerance around plate
+
+register("chat", (player, event) => {
+     completedTerms += 1
+  if (debug) ChatLib.chat("&c[DEBUG:i4] Terminal message deteceted: #" + completedTerms);
+}).setCriteria("completed a terminal!").setContains();
+
+register("tick", () => {
+    if (!(bossActive && moduleEnabled && i4)) return;
+    if (compeltedTerms >= 9) {Chat.say("i4 incomplete");
+    let px = Math.floor(Player.getX());
+    let py = Math.floor(Player.getY());
+    let pz = Math.floor(Player.getZ());
+
+    let onPlate =
+        Math.abs(px - iFourPlate.x) <= iFourTol &&
+        Math.abs(py - iFourPlate.y) <= iFourTol &&
+        Math.abs(pz - iFourPlate.z) <= iFourTol;
+
+    if (onPlate && !iFourActive) {
+        iFourActive = true;
+        iFourStart = true;
+        iFourComplete = false;
+        ChatLib.chat("&e[DungeonMsg] §bI4 Started");
+    }
+
+    if (!onPlate && iFourActive && !iFourComplete) {
+        // left plate without completing
+        iFourActive = false;
+        ChatLib.chat("&e[DungeonMsg] §cI4 Failed");
+    }
+});
+
+register("chat", (event) => {
+    let raw = ChatLib.removeFormatting(ChatLib.getChatMessage(event));
+    let playerName = Player.getName();
+
+    if (iFourActive && raw.includes(playerName + " completed a device")) {
+        iFourComplete = true;
+        iFourActive = false;
+        ChatLib.chat("&e[DungeonMsg] §aI4 Complete");
+    }
+}).setCriteria("${*}");
+
+
 /* ------------------ GUI ------------------ */
 let gui = new Gui();
 
@@ -261,8 +339,9 @@ const buttonX = 10,
     profile_Y = 50,
     tolerance_Y = 75,
     timer_Y = 100,
-    debug_Y = 125,
-    alwaysOn_Y = 150;
+    i4_Y = 125
+    debug_Y = 150,
+    alwaysOn_Y = 175;
 
 function openDungeonMsgGUI() {
     if (debug === true) {
@@ -321,6 +400,14 @@ gui.registerDraw(function(mouseX, mouseY, partialTicks) {
     Renderer.drawRect(Renderer.color(50, 50, 50, 180), buttonX, alwaysOn_Y, buttonW, buttonH);
     if (alwaysOnHovering) Renderer.drawRect(Renderer.color(255, 255, 255, 30), buttonX, alwaysOn_Y, buttonW, buttonH);
     Renderer.drawStringWithShadow("Always On: " + (alwaysOn ? "§aON" : "§cOFF"), buttonX + 6, alwaysOn_Y + 6);
+   
+    // i4 button
+    const i4Hovering = mouseX >= buttonX && mouseX <= buttonX + buttonW &&
+        mouseY >= i4_Y && mouseY <= i4_Y + buttonH;
+
+    Renderer.drawRect(Renderer.color(50, 50, 50, 180), buttonX, i4_Y, buttonW, buttonH);
+    if (i4Hovering) Renderer.drawRect(Renderer.color(255, 255, 255, 30), buttonX, i4_Y, buttonW, buttonH);
+    Renderer.drawStringWithShadow("i4: " + (i4 ? "§aON" : "§cOFF"), buttonX + 6, i4_Y + 6);
 });
 
 // gui interaction functionality
@@ -377,5 +464,14 @@ gui.registerClicked(function(mouseX, mouseY, button) {
         config.alwaysOn = alwaysOn; // Save to config
         saveAll();
         ChatLib.chat("&e[DungeonMsg] Always On set to: " + (alwaysOn ? "§aON" : "§cOFF"));
+    // i4 button
+    if (mouseX >= buttonX && mouseX <= buttonX + buttonW &&
+        mouseY >= i4_Y && mouseY <= i4_Y + buttonH) {
+        i4 = !i4;
+        config.i4 = i4; // Save to config
+        saveAll();
+        ChatLib.chat("&e[DungeonMsg] i4 set to: " + (i4 ? "§aON" : "§cOFF"));
+    }
     }
 })
+
