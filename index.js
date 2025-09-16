@@ -286,7 +286,7 @@ let iFourComplete = false;
 
 // placeholder coords, update to the real I4 pressure plate coords
 let iFourPlate = { x: -16, y: 5, z: 14 };
-let iFourTol = 3; // how close to plate counts as "on it"
+let iFourTol = 2; // how close to plate counts as "on it"
 
 register("chat", (player, event) => {
      completedTerms += 1
@@ -309,14 +309,14 @@ register("tick", () => {
         iFourActive = true;
         iFourStart = true;
         iFourComplete = false;
-        ChatLib.chat("&e[DungeonMsg] §bI4 Started at (" + px + ", " + py + ", " + pz + ")");
+        ChatLib.say("i4 started");
         if (debug) ChatLib.chat("&d[DEBUG:I4] Entered plate coords: " + JSON.stringify(iFourPlate));
     }
 
     if (!onPlate && iFourActive && !iFourComplete) {
         // left plate without completing
         iFourActive = false;
-        ChatLib.chat("&e[DungeonMsg] §cI4 Failed");
+        ChatLib.say("i4 failed")
         if (debug) ChatLib.chat("&d[DEBUG:I4] Player left plate before completion or died");
     }
 
@@ -324,7 +324,7 @@ register("tick", () => {
         // left plate without completing
         iFourActive = false;
         iFourComplete = true;
-        ChatLib.chat("&e[DungeonMsg] §cI4 Incomplete");
+        ChatLib.say("i4 Incomplete");
         if (debug) ChatLib.chat("&d[DEBUG:I4] Too many terminals completed");
     }
 
@@ -340,7 +340,7 @@ register("chat", (event) => {
     if (iFourActive && raw.includes(playerName + " completed a device")) {
         iFourComplete = true;
         iFourActive = false;
-        ChatLib.chat("&e[DungeonMsg] §aI4 Complete");
+        ChatLib.say("i4 Complete");
         if (debug) ChatLib.chat("&d[DEBUG:I4] Detected completion message: " + raw);
     }
 }).setCriteria("${*}");
@@ -508,3 +508,4 @@ gui.registerClicked(function(mouseX, mouseY, button) {
         ChatLib.chat("&e[DungeonMsg] i4 set to: " + (i4 ? "§aON" : "§cOFF"));
     }
 })
+
